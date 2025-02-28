@@ -25,7 +25,10 @@ int main(int argc, char** argv)
    {
      int i;
      for(i = 0; i < num_iter; i++){
+      int thread_num = omp_get_thread_num();
+        printf("thread %d reaches barrier\n", thread_num);
        gtmp_barrier();
+       printf("thread %d passes the barrier\n", thread_num);
      }
    }
 

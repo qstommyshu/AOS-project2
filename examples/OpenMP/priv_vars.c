@@ -8,7 +8,7 @@ int main(int argc, char **argv)
 
   printf("Serial thread: thread_num = %d; x = %d\n", thread_num, x);
 
-#pragma omp parallel num_threads(3) private(thread_num) firstprivate(x)
+#pragma omp parallel num_threads(3) private(thread_num) firstprivate(x) 
   {
     // value of thread_num is indeterminate here
     printf("thread %d: before initialization\n", thread_num);
