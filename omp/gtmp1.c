@@ -2,11 +2,9 @@
 #include "gtmp.h"
 #include <stdio.h>
 
-// counting barrier with sense variable
+// MCS Paper: A sense-reversing centralized barrier
 
 /*
-    From the MCS Paper: A sense-reversing centralized barrier
-
     shared count : integer := P
     shared sense : Boolean := true
     processor private local_sense : Boolean := true

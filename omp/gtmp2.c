@@ -18,6 +18,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// MCS Paper: A software combining tree barrier with optimized wakeup
+
+
+/*
+    type node = record
+        k : integer //fan in of this node
+	count : integer // initialized to k
+	locksense : Boolean // initially false
+	parent : ^node // pointer to parent node; nil if root
+
+	shared nodes : array [0..P-1] of node
+	    //each element of nodes allocated in a different memory module or cache line
+
+	processor private sense : Boolean := true
+	processor private mynode : ^node // my group's leaf in the combining tree
+
+	procedure combining_barrier
+	    combining_barrier_aux (mynode) // join the barrier
+	    sense := not sense             // for next barrier
+
+
+	procedure combining_barrier_aux (nodepointer : ^node)
+	    with nodepointer^ do
+	        if fetch_and_decrement (&count) = 1 // last one to reach this node
+		    if parent != nil
+		        combining_barrier_aux (parent)
+		    count := k // prepare for next barrier
+		    locksense := not locksense // release waiting processors
+		repeat until locksense = sense
+*/
+
 #define MAX_FAN_IN 2
 
 typedef struct node {
@@ -29,9 +60,9 @@ typedef struct node {
 
 static node **nodes;
 
-// 每个线程的私有变量
-static __thread int sense = 0;
-static __thread node *mynode;
+// thread local variables
+static int sense = 0;
+static node *mynode;
 
 // void gtmp_init(int num_threads) {
 //     nodes = (node **)malloc(num_threads * sizeof(node *));
@@ -65,14 +96,13 @@ static __thread node *mynode;
 
 void gtmp_init(int num_threads) {
     nodes = (node **)malloc(num_threads * sizeof(node *));
-    // 先为所有节点分配内存
+    // allocate memory for all nodes
     for (int i = 0; i < num_threads; i++) {
         nodes[i] = (node *)malloc(sizeof(node));
     }
-    // 为每个节点计算孩子数量，并初始化 k 和 count
+    // node initialization
     for (int i = 0; i < num_threads; i++) {
         int child_count = 0;
-        // 计算在以 i 为根的子树中有多少个孩子
         int first_child = i * MAX_FAN_IN + 1;
         for (int j = first_child; j < first_child + MAX_FAN_IN && j < num_threads; j++) {
             child_count++;
@@ -81,40 +111,38 @@ void gtmp_init(int num_threads) {
         nodes[i]->k = child_count + 1;
         nodes[i]->count = nodes[i]->k;
         nodes[i]->locksense = 0;
-        // 设置父节点：根节点的父节点为 NULL
         nodes[i]->parent = (i == 0) ? NULL : nodes[(i - 1) / MAX_FAN_IN];
     }
 
-    // 打印每个节点的信息
-    for (int i = 0; i < num_threads; i++) {
-        printf("node %d's parent is %d, k = %d, count = %d\n", 
-               i, 
-               (nodes[i]->parent ? (i - 1) / MAX_FAN_IN : -1), 
-               nodes[i]->k, 
-               nodes[i]->count);
-    }
+    // // debug
+    // for (int i = 0; i < num_threads; i++) {
+    //     printf("node %d's parent is %d, k = %d, count = %d\n", 
+    //            i, 
+    //            (nodes[i]->parent ? (i - 1) / MAX_FAN_IN : -1), 
+    //            nodes[i]->k, 
+    //            nodes[i]->count);
+    // }
 }
 
 
 static void combining_barrier_aux(node *cur, int sense) {
-    int tid = omp_get_thread_num();
-    printf("thread %d's node count is %d\n", tid, cur->count);
-    if (__sync_fetch_and_sub(&cur->count, 1) == 1) {  // 当前节点最后一个到达者
+    // int tid = omp_get_thread_num();
+    // printf("thread %d's node count is %d\n", tid, cur->count);
+    // last arrival flip the sense variable and count
+    if (__sync_fetch_and_sub(&cur->count, 1) == 1) {
         if (cur->parent) combining_barrier_aux(cur->parent, sense);
-        cur->count = cur->k;        // 重置计数器
-        cur->locksense = !cur->locksense; // 翻转释放锁
-        printf("thread %d flip the lock sense------\n", tid);
-    } else {  // 非最后一个到达者
-        while (cur->locksense != sense) {
-            printf("thread %d count is %d\n", tid, cur->count);
-        }; // 自旋等待
+        cur->count = cur->k;
+        cur->locksense = !cur->locksense;
+        // printf("thread %d flip the lock sense------\n", tid);
+    } else {
+        while (cur->locksense != sense);
     }
 }
 
 void gtmp_barrier() {
     int tid = omp_get_thread_num();
     mynode = nodes[tid];
-    sense = !mynode->locksense;  // 为下一次屏障准备
+    sense = !mynode->locksense;
     combining_barrier_aux(mynode, sense);
 }
 

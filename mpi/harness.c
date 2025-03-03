@@ -20,7 +20,14 @@ int main(int argc, char** argv)
   
   int k;
   for(k = 0; k < num_rounds; k++){
+    int tid;
+    MPI_Comm_rank(MPI_COMM_WORLD, &tid);
+
+    printf("thread %d reaches barrier\n", tid);
+
     gtmpi_barrier();
+
+    printf("thread %d passes the barrier\n", tid);
   }
 
   gtmpi_finalize();  
