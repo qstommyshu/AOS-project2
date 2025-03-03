@@ -1,25 +1,9 @@
-// #include <omp.h>
-// #include "gtmp.h"
-
-// void gtmp_init(int num_threads){
-
-// }
-
-// void gtmp_barrier(){
-
-// }
-
-// void gtmp_finalize(){
-
-// }
-
 #include <omp.h>
-#include <stdbool.h>
+#include "gtmp.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 // MCS Paper: A software combining tree barrier with optimized wakeup
-
 
 /*
     type node = record
@@ -64,36 +48,6 @@ static node **nodes;
 static int sense = 0;
 static node *mynode;
 
-// void gtmp_init(int num_threads) {
-//     nodes = (node **)malloc(num_threads * sizeof(node *));
-
-//     // // root init
-//     // nodes[0] = (node *)malloc(sizeof(node));
-//     // nodes[0]->k = MAX_FAN_IN;
-//     // nodes[0]->count = nodes[0]->k; // initialize to k
-//     // nodes[0]->locksense = 0;
-//     // nodes[0]->parent = NULL;
-
-//     // 为每个线程创建叶子节点
-//     for (int i = 0; i < num_threads; i++) {
-//         nodes[i] = (node *)malloc(sizeof(node));
-//         // if num_threads is even, then all nodes have two children, if not, the last child has one
-//         nodes[i]->k = (num_threads % MAX_FAN_IN == 0 || i < num_threads - 1) ? MAX_FAN_IN : i % MAX_FAN_IN; 
-//         nodes[i]->count = nodes[i]->k;
-//         nodes[i]->locksense = 0;
-//         nodes[i]->parent = nodes[(i - 1)/MAX_FAN_IN]; // its parent in the tree
-//         // printf("num_thread is %d, value is %d, %d\n", num_threads, num_threads % MAX_FAN_IN == 0, i < num_threads - 1);
-//     }
-
-//     // root does not have parent
-//     nodes[0]->parent = NULL;
-
-//     for (int i = 0; i < num_threads; i++) {
-//         printf("node %d's parent is %d\n", i, (i - 1)/MAX_FAN_IN);
-//         // printf("node %d's count is %d\n", i, nodes[i]->count);
-//     }
-// }
-
 void gtmp_init(int num_threads) {
     nodes = (node **)malloc(num_threads * sizeof(node *));
     // allocate memory for all nodes
@@ -107,21 +61,21 @@ void gtmp_init(int num_threads) {
         for (int j = first_child; j < first_child + MAX_FAN_IN && j < num_threads; j++) {
             child_count++;
         }
-        // k 等于本节点（1）加上所有孩子的数量
+        // k is the fan in of a node plus its own arrival
         nodes[i]->k = child_count + 1;
         nodes[i]->count = nodes[i]->k;
         nodes[i]->locksense = 0;
         nodes[i]->parent = (i == 0) ? NULL : nodes[(i - 1) / MAX_FAN_IN];
     }
 
-    // // debug
-    // for (int i = 0; i < num_threads; i++) {
-    //     printf("node %d's parent is %d, k = %d, count = %d\n", 
-    //            i, 
-    //            (nodes[i]->parent ? (i - 1) / MAX_FAN_IN : -1), 
-    //            nodes[i]->k, 
-    //            nodes[i]->count);
-    // }
+    // debug
+    for (int i = 0; i < num_threads; i++) {
+        printf("node %d's parent is %d, k = %d, count = %d\n", 
+               i, 
+               (nodes[i]->parent ? (i - 1) / MAX_FAN_IN : -1), 
+               nodes[i]->k, 
+               nodes[i]->count);
+    }
 }
 
 

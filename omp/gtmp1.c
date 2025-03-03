@@ -29,7 +29,7 @@ void gtmp_init(int num_threads){
 void gtmp_barrier(){
     int local_sense;
 
-    int cur_count = omp_get_thread_num();
+    // int cur_count = omp_get_thread_num();
 
     #pragma omp atomic read
     local_sense = sense;
@@ -39,13 +39,13 @@ void gtmp_barrier(){
     // thread_count--;
 
     if (__sync_fetch_and_sub(&thread_count, 1) == 1) {
-        printf("thread %d set count back to N-------\n", cur_count);
+        // printf("thread %d set count back to N-------\n", cur_count);
         thread_count = omp_get_num_threads();
 
         #pragma omp atomic write
         sense = local_sense;
     } else {
-        printf("thread %d spining...\n", cur_count);
+        // printf("thread %d spining...\n", cur_count);
         while (local_sense != sense);
     }
 
